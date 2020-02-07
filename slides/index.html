@@ -24,7 +24,8 @@
 
     <style>
       .reveal .lab {
-        background-color: #daddb0;
+        /* background-color: #daddb0; */
+        background-color: darkolivegreen;
       }
 
       .link-style {
@@ -66,7 +67,9 @@
         <section>
           <h2>Agenda</h2>
 
-          <h4>Introduction to async Rust</h4>
+          <h4>Async in Rust</h4>
+          <h4 class="lab">Make a HTTP request</h4>
+          <h4>Rust Futures</h4>
           <h4 class="lab">Implement and run a future by hand</h4>
           <h4>Tasks, executors and reactors</h4>
           <h4 class="lab">Build an executor</h4>
@@ -159,7 +162,7 @@ async fn main() -> Result<(), Box&lt;dyn std::error::Error&gt;> {
           </section>
 
           <section>
-            <p>Unlike C# or JavaScript, the `await` keyword does not prefix the expression that evaluates to a task/promise.</p>
+            <p>Unlike C# or JavaScript, the <code>await</code> keyword does not prefix the expression that evaluates to a task/promise.</p>
             <div class="fragment">
               <p>It occurs instead after a <code>.</code> (dot) post the expression that evalues to a future.</p>
 
@@ -177,6 +180,88 @@ async fn main() -> Result<(), Box&lt;dyn std::error::Error&gt;> {
           </section>
 
           <section>
+            <p>Rust today supports async functions and async blocks.</p>
+            <div class="fragment">
+              <p>An async function is decorated with the <code>async</code> keyword.</p>
+              <pre><code data-trim data-noescape data-line-numbers>
+async fn do_it() -> i32 {
+  42
+}</code></pre>
+            </div>
+            <div class="fragment">
+              <p>This is basically syntactic sugar for the following:</p>
+              <pre><code data-trim data-noescape data-line-numbers>
+fn do_it() -> impl Future&lt;Output = i32&gt; {
+  ...
+}</code></pre>
+              <p>Only async functions can use the <code>await</code> keyword.</p>
+            </div>
+          </section>
+
+          <section>
+            <p>Rust <em>does not</em> support async closures today.</p>
+            <p class="fragment">You can however create async <em>blocks</em>.</p>
+            <div class="fragment">
+              <p>
+                Async blocks are like regular code blocks except that you decorate them with
+                the <code>async</code> keyword.
+              </p>
+              <pre><code data-trim data-noescape data-line-numbers>
+  let fut = async {
+    do_it().await
+  };</code></pre>
+            </div>
+            <p class="fragment">Async blocks evaluate to an anonymous type that implements
+              <code>Future</code>.
+            </p>
+          </section>
+
+          <section>
+            <p>If you want to use variables from the block's environment
+              across await points then you <em>may</em> have to use the <code>move</code>
+              keyword to take ownership.
+            </p>
+            <pre><code data-trim data-noescape data-line-numbers>
+let v = Foo::default();
+let fut = async move {
+  do_it(v).await;
+};</code></pre>
+          </section>
+
+          <section>
+            <p>The async keyword is <em>not</em> supported in traits today (as of Rust 1.41).</p>
+            <div class="fragment">
+              <p>You cannot do this:</p>
+              <pre><code data-trim data-noescape data-line-numbers>
+  trait Foo {
+    async fn do_the_thing() -> i32;
+  }</code></pre>
+            </div>
+            <p class="fragment">You cannot do this because...</p>
+            <p class="fragment">Reasons.</p>
+          </section>
+
+          <section>
+            <p>But, there's a crate called <strong>async-trait</strong> that lets you do this.</p>
+            <pre><code data-trim data-noescape data-line-numbers>
+#[async_trait]
+trait Answer {
+  async fn question(&self) -> Result&lt;String, String&gt;;
+}
+
+#[async_trait]
+impl Answer for i32 {
+  async fn question(&self) -> Result&lt;String, String&gt; {
+    if self == 42 {
+      Ok(compute_question().await)
+    } else {
+      Err("wrong answer".to_string())
+    }
+  }
+}</code></pre>
+          </section>
+
+          <section>
             <h2>Lab 1</h2>
             <h3>Make a HTTP request</h3>
             <p class="link-style"><a href="https://aka.ms/rust-async-lab1">https://aka.ms/rust-async-lab1</a></p>
@@ -189,17 +274,79 @@ async fn main() -> Result<(), Box&lt;dyn std::error::Error&gt;> {
           </section>
 
           <section>
-            <p>A `Future` is a trait that represents a type that will yield a value at some
+            <p>A <code>Future</code> is a trait that represents a type that will yield a value at some
             point in the future.</p>
             <p>Analogus to JavaScript promises and .NET tasks.</p>
             <pre><code data-trim data-noescape data-line-numbers>
 pub trait Future {
   type Output;
 
-  fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output>;
+  fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll&lt;Self::Output&gt;
 }</code></pre>
 
             <p>Rust futures are <em>poll</em> based unlike JS or .NET.</p>
+          </section>
+
+          <section>
+            <p>Rust futures don't <em>do</em> anything until somebody calls the <code>Future::poll</code> function.</p>
+            <p class="fragment">
+              Async runtimes such as <strong>Tokio</strong> and <strong>async-std</strong> include what
+              are known as <em>executors</em>.
+            </p>
+            <p class="fragment">Executors are responsible for driving a future to completion.</p>
+            <p class="fragment">They call <code>Future::poll</code> repeatedly till it returns <code>Poll::Ready</code>.</p>
+            <p class="fragment">If <code>Future::poll</code> returns <code>Poll::Pending</code> then it waits till "woken up".</p>
+          </section>
+
+          <section>
+            <p>
+              How long will the function <code>how_long</code> take to run?
+            </p>
+            <pre><code data-trim data-noescape data-line-numbers>
+async fn do_sleep() {
+  Delay::new(Duration::from_secs(5)).await;
+}
+
+async fn how_long() {
+  let f1 = do_sleep();
+  let f2 = do_sleep();
+  
+  f1.await;
+  f2.await;
+}</code></pre>
+
+            <div class="fragment">
+              <p>If you want both futures to run simultaneously, you'll want to use <code>futures::join!</code>.</p>
+              <pre><code data-trim data-noescape>
+futures::join!(f1, f2)</code>
+            </div>
+          </section>
+
+          <section>
+            <p>
+              Future implementations notify the executor that they are ready to make progress by
+              using a <em>waker</em>.
+            </p>
+            <p class="fragment">The <code>Context</code> type passed to <code>Future::poll</code>
+            provides a <code>Waker</code> struct that knows how to notify the executor.</p>
+
+            <pre class="fragment"><code data-trim data-noescape data-line-numbers>
+impl Future for Delay {
+  type Output = ();
+
+  fn poll(mut self: Pin&lt;&amp;mut Self&gt;, cx: &amp;mut Context) -&gt; Poll&lt;Self::Output&gt; {
+    // if async I/O work is complete
+    cx.waker.wake();
+    Poll::Ready(())
+  }
+}</code></pre>
+          </section>
+
+          <section>
+            <p>The <code>Waker</code> is an abstraction designed to represent system provided
+            notification mechanisms.</p>
+            <p class="fragment">Typically backed by <code>epoll</code>, <code>kqueue</code> and
+            <code>I/O Completion Ports</code> on Linux, macOS and Windows respectively.</p>
           </section>
 
           <section>
@@ -210,11 +357,11 @@ pub trait Future {
             <pre><code data-trim data-noescape data-line-numbers>
 use std::pin::Pin;
 use std::future::Future;
-use std::task::{Poll, Context};
+use std::task::s{Poll, Context};
 
 struct Ready&lt;T&gt;(Option&lt;T&gt;);
 
-impl<T: Unpin> Future for Ready<T> {
+impl&lt;T: Unpin&gt; Future for Ready&lt;T&gt; {
   type Output = T;
   
   fn poll(mut self: Pin<&mut Self>, _cx: &mut Context) -> Poll&lt;Self::Output&gt; {

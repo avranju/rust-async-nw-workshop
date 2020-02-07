@@ -119,3 +119,15 @@ fn main() -> Result<(), Box<dyn Error>> {
 Positive
 : Note the absence of a `;` at the end of the last line in `main`. That should cause the return
 value of `block_on` to be the return value of `main`.
+
+### Execute the request
+
+Use the [reqwest::get](https://docs.rs/reqwest/0.10.1/reqwest/fn.get.html) function to kick off
+the request and then use the [Response::json](https://docs.rs/reqwest/0.10.1/reqwest/struct.Response.html#method.json)
+function to de-serialize the JSON response into an instance of your struct.
+
+And finally, print the result on to the console via:
+
+```rust
+println!("{:#?}", res);
+```

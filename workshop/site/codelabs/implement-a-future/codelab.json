@@ -3,9 +3,9 @@
   "format": "html",
   "prefix": "https://storage.googleapis.com",
   "mainga": "UA-49880327-14",
-  "updated": "2020-02-06T21:28:48-08:00",
+  "updated": "2020-02-06T23:54:17-08:00",
   "id": "implement-a-future",
-  "duration": 2,
+  "duration": 31,
   "title": "Implement a future by hand",
   "authors": "Rajasekharan Vengalil",
   "summary": "Implement a future by hand",
@@ -15,7 +15,7 @@
     "published"
   ],
   "category": [
-    "rust-workshop"
+    "rust"
   ],
   "tags": [],
   "feedback": "https://github.com/avranju/rust-async-nw-workshop/issues",

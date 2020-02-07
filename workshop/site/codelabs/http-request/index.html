@@ -110,6 +110,11 @@ fn main() -&gt; Result&lt;(), Box&lt;dyn Error&gt;&gt; {
 </code></pre>
 <aside class="special"><p>Note the absence of a <code>;</code> at the end of the last line in <code>main</code>. That should cause the return value of <code>block_on</code> to be the return value of <code>main</code>.</p>
 </aside>
+<h2 is-upgraded>Execute the request</h2>
+<p>Use the <a href="https://docs.rs/reqwest/0.10.1/reqwest/fn.get.html" target="_blank">reqwest::get</a> function to kick off the request and then use the <a href="https://docs.rs/reqwest/0.10.1/reqwest/struct.Response.html#method.json" target="_blank">Response::json</a> function to de-serialize the JSON response into an instance of your struct.</p>
+<p>And finally, print the result on to the console via:</p>
+<pre><code>println!(&#34;{:#?}&#34;, res);
+</code></pre>
 
 
       </google-codelab-step>
