@@ -1,5 +1,4 @@
 use std::io::{Error, ErrorKind};
-use std::str;
 
 use bytes::{Buf, BufMut, BytesMut};
 use tokio_util::codec::{Decoder, Encoder};
@@ -79,10 +78,11 @@ impl Decoder for EventCodec {
                     return Ok(None);
                 }
 
-                let user = str::from_utf8(&src[0..len])
+                let user = String::from_utf8(src[0..len].to_vec())
                     .map_err(|_| Error::new(ErrorKind::InvalidData, "Bad bytes"))?;
+                src.advance(len);
 
-                Event::Join(user.to_string())
+                Event::Join(user)
             }
             1 => {
                 if src.len() < 8 {
@@ -123,10 +123,11 @@ impl Decoder for EventCodec {
                     return Ok(None);
                 }
 
-                let msg = str::from_utf8(&src[0..len])
+                let msg = String::from_utf8(src[0..len].to_vec())
                     .map_err(|_| Error::new(ErrorKind::InvalidData, "Bad bytes"))?;
+                src.advance(len);
 
-                Event::Message(id, msg.to_string())
+                Event::Message(id, msg)
             }
             _ => return Err(Error::new(ErrorKind::InvalidData, "Bad bytes")),
         };
