@@ -1,0 +1,125 @@
+
+<!doctype html>
+
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+  <meta name="theme-color" content="#4F7DC9">
+  <meta charset="UTF-8">
+  <title>Make a HTTP request</title>
+  <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Source+Code+Pro:400|Roboto:400,300,400italic,500,700|Roboto+Mono">
+  <link rel="stylesheet" href="//fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://storage.googleapis.com/codelab-elements/codelab-elements.css">
+  <style>
+    .success {
+      color: #1e8e3e;
+    }
+    .error {
+      color: red;
+    }
+  </style>
+</head>
+<body>
+  <google-codelab-analytics gaid="UA-49880327-14"></google-codelab-analytics>
+  <google-codelab codelab-gaid=""
+                  id="http-request"
+                  title="Make a HTTP request"
+                  environment="web"
+                  feedback-link="https://github.com/avranju/rust-async-nw-workshop/issues">
+    
+      <google-codelab-step label="Create a new project" duration="2">
+        <p>Create a new rust binary project like so:</p>
+<pre><code>cargo new http-request
+</code></pre>
+<p>Open <code>Cargo.toml</code> and add the following dependencies:</p>
+<pre><code>reqwest = { version = &#34;0.10&#34;, features = [&#34;json&#34;] }
+serde = { version = &#34;1.0&#34;, features = [&#34;derive&#34;] }
+serde_json = &#34;1.0&#34;
+tokio = { version = &#34;0.2&#34;, features = [&#34;full&#34;] }
+</code></pre>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Define a struct to de-serialize the data" duration="5">
+        <p>We will issue an HTTP <code>GET</code> request to the URL <code>https://httpbin.org/get</code>. The response will typically be JSON that looks like this:</p>
+<pre><code>{
+    &#34;args&#34;: {},
+    &#34;headers&#34;: {
+        &#34;Accept&#34;: &#34;*/*&#34;,
+        &#34;Accept-Encoding&#34;: &#34;gzip, deflate&#34;,
+        &#34;Host&#34;: &#34;httpbin.org&#34;,
+        &#34;User-Agent&#34;: &#34;HTTPie/0.9.8&#34;,
+        &#34;X-Amzn-Trace-Id&#34;: &#34;Root=1-5e3ce885-d91ccb50e7e8e0c209c1338d&#34;
+    },
+    &#34;origin&#34;: &#34;73.254.58.77&#34;,
+    &#34;url&#34;: &#34;https://httpbin.org/get&#34;
+}
+</code></pre>
+<p>Define a struct that can be constructed by de-serializing the JSON given above (you can ignore the <code>args</code> field if you like) using the <code>serde</code> and <code>serde-json</code> crates. Here&#39;s a <a href="https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=7f540d05682d55b47efa921a9dd718fc" target="_blank">short example</a> of de-serializing structs from JSON using <code>serde</code> if you haven&#39;t tried that before:</p>
+<pre><code>use serde::Deserialize;
+use serde_json;
+
+#[derive(Debug, Deserialize)]
+struct Person {
+  name: String,
+  age: i32,
+}
+
+fn main() {
+  let json = r##&#34;
+  {
+      &#34;name&#34;: &#34;Arthur Dent&#34;,
+      &#34;age&#34;: 28
+  }
+  &#34;##;
+  
+  let p = serde_json::from_str::&lt;Person&gt;(json).unwrap();
+  println!(&#34;{:#?}&#34;, p);
+}
+</code></pre>
+<aside class="special"><p><strong>Note</strong>: One way of de-serializing the <code>headers</code> field might be to use the <code>HashMap&lt;String, String&gt;</code> type.</p>
+</aside>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Make the request" duration="5">
+        <h2 is-upgraded>Initialize Tokio runtime</h2>
+<p>In order to be able to run a future to completion, we need an executor which is a component that knows how to poll a future. We use the <code>tokio</code> crate in this exercise which comes with an efficient executor. Here&#39;s <a href="https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=acaab174b0783bc810d9f52e14b6ddb4" target="_blank">one way</a> you can instantiate and run a future to completion using the tokio runtime:</p>
+<pre><code>use tokio;
+
+fn main() {
+  let mut runtime = tokio::runtime::Runtime::new().unwrap();
+  runtime.block_on(async {
+    println!(&#34;I am the future y&#39;all!&#34;);
+  });
+}
+</code></pre>
+<h2 is-upgraded>Handle errors</h2>
+<p>You will need to think about what the return type of <code>main</code> should be. All error types usually implement the standard <a href="https://doc.rust-lang.org/stable/std/error/trait.Error.html" target="_blank">Error</a> trait so you might simply return a trait object for the <code>Error</code> trait like so:</p>
+<pre><code>use std::error::Error;
+
+fn main() -&gt; Result&lt;(), Box&lt;dyn Error&gt;&gt; {
+  let mut runtime = tokio::runtime::Runtime::new().unwrap();
+  runtime.block_on(async {
+    println!(&#34;I am the future y&#39;all!&#34;);
+    Ok(())
+  })
+}
+</code></pre>
+<aside class="special"><p>Note the absence of a <code>;</code> at the end of the last line in <code>main</code>. That should cause the return value of <code>block_on</code> to be the return value of <code>main</code>.</p>
+</aside>
+
+
+      </google-codelab-step>
+    
+  </google-codelab>
+
+  <script src="https://storage.googleapis.com/codelab-elements/native-shim.js"></script>
+  <script src="https://storage.googleapis.com/codelab-elements/custom-elements.min.js"></script>
+  <script src="https://storage.googleapis.com/codelab-elements/prettify.js"></script>
+  <script src="https://storage.googleapis.com/codelab-elements/codelab-elements.js"></script>
+
+</body>
+</html>

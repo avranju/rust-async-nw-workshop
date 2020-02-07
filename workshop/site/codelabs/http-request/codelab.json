@@ -1,0 +1,23 @@
+{
+  "environment": "web",
+  "format": "html",
+  "prefix": "https://storage.googleapis.com",
+  "mainga": "UA-49880327-14",
+  "updated": "2020-02-06T21:28:50-08:00",
+  "id": "http-request",
+  "duration": 12,
+  "title": "Make a HTTP request",
+  "authors": "Rajasekharan Vengalil",
+  "summary": "Make a HTTP request",
+  "source": "http-request.md",
+  "theme": "",
+  "status": [
+    "published"
+  ],
+  "category": [
+    "rust-workshop"
+  ],
+  "tags": [],
+  "feedback": "https://github.com/avranju/rust-async-nw-workshop/issues",
+  "url": "http-request"
+}

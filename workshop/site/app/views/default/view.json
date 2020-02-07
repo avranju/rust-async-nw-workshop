@@ -1,0 +1,13 @@
+{
+  "title": "Async/Network programming workshop in Rust",
+  "description": "Set of codelabs designed to help understand async and network programming in Rust.",
+  "tags": [],
+  "categories": [],
+  "exclude": [
+    "^lang-.*"
+  ],
+  "logoUrl": "/images/logo.png",
+  "toolbarBgColor": "#37474F",
+  "sort": "mainCategory",
+  "pins": []
+}

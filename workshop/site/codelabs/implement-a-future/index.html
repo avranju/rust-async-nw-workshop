@@ -1,0 +1,63 @@
+
+<!doctype html>
+
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+  <meta name="theme-color" content="#4F7DC9">
+  <meta charset="UTF-8">
+  <title>Implement a future by hand</title>
+  <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Source+Code+Pro:400|Roboto:400,300,400italic,500,700|Roboto+Mono">
+  <link rel="stylesheet" href="//fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://storage.googleapis.com/codelab-elements/codelab-elements.css">
+  <style>
+    .success {
+      color: #1e8e3e;
+    }
+    .error {
+      color: red;
+    }
+  </style>
+</head>
+<body>
+  <google-codelab-analytics gaid="UA-49880327-14"></google-codelab-analytics>
+  <google-codelab codelab-gaid=""
+                  id="implement-a-future"
+                  title="Implement a future by hand"
+                  environment="web"
+                  feedback-link="https://github.com/avranju/rust-async-nw-workshop/issues">
+    
+      <google-codelab-step label="Delay future" duration="1">
+        <p>The idea is to implement a future that does the work that Tokio&#39;s <a href="https://docs.rs/tokio/0.2.11/tokio/time/fn.delay_for.html" target="_blank">delay_for</a> function does. <code>delay_for</code> takes as input a duration and returns a future that resolves when that time duration has elapsed. Here&#39;s an <a href="https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=6a6ac8facf27db3a5e172538697cd6e3" target="_blank">example</a> of how this can be used:</p>
+<pre><code>use std::time::Duration;
+use tokio::time::delay_for;
+
+#[tokio::main]
+async fn main() {
+    println!(&#34;waiting 2 seconds&#34;);
+
+    // wait 2 seconds
+    delay_for(Duration::from_secs(2)).await;
+
+    println!(&#34;Done waiting.&#34;);
+}
+</code></pre>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Create ne" duration="1">
+        <p>Boo yah</p>
+
+
+      </google-codelab-step>
+    
+  </google-codelab>
+
+  <script src="https://storage.googleapis.com/codelab-elements/native-shim.js"></script>
+  <script src="https://storage.googleapis.com/codelab-elements/custom-elements.min.js"></script>
+  <script src="https://storage.googleapis.com/codelab-elements/prettify.js"></script>
+  <script src="https://storage.googleapis.com/codelab-elements/codelab-elements.js"></script>
+
+</body>
+</html>

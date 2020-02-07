@@ -8,7 +8,7 @@
 
     <link rel="stylesheet" href="css/reset.css">
     <link rel="stylesheet" href="css/reveal.css">
-    <link rel="stylesheet" href="css/theme/solarized.css">
+    <link rel="stylesheet" href="css/theme/moon.css">
 
     <!-- Theme used for syntax highlighting of code -->
     <link rel="stylesheet" href="lib/css/monokai.css">
@@ -25,6 +25,10 @@
     <style>
       .reveal .lab {
         background-color: #daddb0;
+      }
+
+      .link-style {
+        font-size: 1.5em;
       }
     </style>
   </head>
@@ -54,6 +58,9 @@
           <iframe width="560" height="315" src="https://www.youtube.com/embed/NNwK5ZPAJCk" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
           <br>
           <small>The Talk You've Been Await-ing for</small>
+
+          <p>The <a href="https://rust-lang.github.io/async-book/">Rust Async Book</a> is also an excellent (albeit incomplete) resource:</p>
+          <p class="link-style"><a href="https://aka.ms/rust-async-book">https://aka.ms/rust-async-book</a></p>
         </section>
 
         <section>
@@ -150,6 +157,30 @@ async fn main() -> Result<(), Box&lt;dyn std::error::Error&gt;> {
   Ok(())
 }</code></pre>
           </section>
+
+          <section>
+            <p>Unlike C# or JavaScript, the `await` keyword does not prefix the expression that evaluates to a task/promise.</p>
+            <div class="fragment">
+              <p>It occurs instead after a <code>.</code> (dot) post the expression that evalues to a future.</p>
+
+              <pre><code>let result = async_function().await;</code></pre>
+            </div>
+
+            <br />
+            <p class="fragment">If you don't like it, well, you <em>will</em> get used to it.</p> 
+
+            <div class="fragment">
+              <p>The consensus (sort of) was that this is the most ergonomic syntax that allowed using the <code>?</code> operator.</p>
+
+              <pre><code>let result = async_function_that_can_fail().await?;</code></pre>
+          </div>
+          </section>
+
+          <section>
+            <h2>Lab 1</h2>
+            <h3>Make a HTTP request</h3>
+            <p class="link-style"><a href="https://aka.ms/rust-async-lab1">https://aka.ms/rust-async-lab1</a></p>
+          </section>
         </section>
 
         <section>
@@ -201,9 +232,9 @@ impl<T: Unpin> Future for Ready<T> {
           </section>
 
           <section>
-            <h2>Lab 1</h2>
+            <h2>Lab 2</h2>
             <h3>Implement a future by hand</h3>
-            <p style="font-size: 1.5em;"><a href="https://aka.ms/rust-async-lab1">https://aka.ms/rust-async-lab1</a></p>
+            <p class="link-style"><a href="https://aka.ms/rust-async-lab2">https://aka.ms/rust-async-lab2</a></p>
           </section>
         </section>
 
@@ -211,7 +242,7 @@ impl<T: Unpin> Future for Ready<T> {
           <h3>Feedback</h3>
           <p>It'd be awesome if you could please fill out a feedback form here:</p>
 
-          <p style="font-size: 1.5em;"><a href="https://aka.ms/rust-async-feedback">https://aka.ms/rust-async-feedback</a></section></p>
+          <p class="link-style"><a href="https://aka.ms/rust-async-feedback">https://aka.ms/rust-async-feedback</a></section></p>
         </section>
       </div>
     </div>

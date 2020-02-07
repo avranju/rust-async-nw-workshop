@@ -1,6 +1,6 @@
 Summary: Implement a future by hand
 Id: implement-a-future
-Categories: rust
+Categories: web
 Status: Published
 Feedback Link: https://github.com/avranju/rust-async-nw-workshop/issues
 Authors: Rajasekharan Vengalil
