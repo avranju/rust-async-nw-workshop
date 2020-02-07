@@ -4,6 +4,7 @@ use std::sync::{Arc, RwLock};
 
 use futures::future;
 use futures_util::sink::SinkExt;
+use log::info;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::stream::StreamExt;
 use tokio_util::codec::{Decoder, Framed};
@@ -126,7 +127,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         tokio::spawn(async move {
             while let Some(event) = session.next_event(id).await {
-                println!("{:?}", event);
+                info!("{:?}", event);
                 match event {
                     Event::Join(name) => {
                         session.update_user(id, name);
