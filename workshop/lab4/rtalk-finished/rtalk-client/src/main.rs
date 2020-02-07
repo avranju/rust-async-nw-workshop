@@ -1,5 +1,3 @@
-#![recursion_limit = "256"]
-
 use std::env;
 use std::error::Error;
 
@@ -45,8 +43,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         Event::JoinResponse(id) => {
                             user_id = id;
                         }
-                        Event::Message(_, msg) => {
-                            println!("{}", msg);
+                        Event::Message(id, msg) => {
+                            println!("id:> {}", msg);
                         }
                         _ => unreachable!(),
                     }
@@ -54,9 +52,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             },
             msg = stdin.next().fuse() => {
                 if let Some(Ok(msg)) = msg {
-                    println!("You typed: {}", msg);
                     framed.send(Event::Message(user_id, msg)).await.expect("Message send failed.");
-                    println!("Sent message event");
                 }
             },
             complete => break,

@@ -1,0 +1,6 @@
+[workspace]
+members = [
+  "rtalk-codec",
+  "rtalk-client",
+  "rtalk-server",
+]
