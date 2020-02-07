@@ -1,0 +1,237 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <title>Async/Network programming in Rust</title>
+
+    <link rel="stylesheet" href="css/reset.css">
+    <link rel="stylesheet" href="css/reveal.css">
+    <link rel="stylesheet" href="css/theme/solarized.css">
+
+    <!-- Theme used for syntax highlighting of code -->
+    <link rel="stylesheet" href="lib/css/monokai.css">
+
+    <!-- Printing and PDF exports -->
+    <script>
+      var link = document.createElement( 'link' );
+      link.rel = 'stylesheet';
+      link.type = 'text/css';
+      link.href = window.location.search.match( /print-pdf/gi ) ? 'css/print/pdf.css' : 'css/print/paper.css';
+      document.getElementsByTagName( 'head' )[0].appendChild( link );
+    </script>
+
+    <style>
+      .reveal .lab {
+        background-color: #daddb0;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="reveal">
+      <div class="slides">
+        <section>
+          <h1>Async and network programming with Rust</h1>
+          <h4>Raj Vengalil (rajave)</h4>
+          <h4>Denis Molokanov (dmolokan)</h4>
+        </section>
+
+        <section>
+          <h2>Who are we</h2>
+          <ul>
+            <p class="fragment">Devs who work for Azure IoT</p>
+            <p class="fragment">Shipped Rust in <a href="https://github.com/azure/iotedge">Azure IoT Edge</a> in production</p>
+            <p class="fragment">Contains >70K lines of Rust code</p>
+            <p class="fragment">Multiple cloud services being built in Rust</p>
+            <p class="fragment">Have been at it (writing Rust) for ~2 years</p
+          </ul>
+        </section>
+
+        <section>
+          <p>Today's workshop is basically a workshop version of this very excellent talk
+          by Steve Klabnik:</p>
+          <iframe width="560" height="315" src="https://www.youtube.com/embed/NNwK5ZPAJCk" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+          <br>
+          <small>The Talk You've Been Await-ing for</small>
+        </section>
+
+        <section>
+          <h2>Agenda</h2>
+
+          <h4>Introduction to async Rust</h4>
+          <h4 class="lab">Implement and run a future by hand</h4>
+          <h4>Tasks, executors and reactors</h4>
+          <h4 class="lab">Build an executor</h4>
+          <h4>Network programming with Tokio</h4>
+          <h4 class="lab">Networking app exercise lab</h4>
+        </section>
+
+        <section>
+          <h2>What you will need for the labs</h2>
+
+          <ul>
+            <li>A laptop (duh!)</li>
+            <li>Install Rust from <a href="https://rustup.rs/">https://rustup.rs/</a></li>
+            <li>Visual Studio Code with the
+              <a href="https://marketplace.visualstudio.com/items?itemName=rust-lang.rust">Rust RLS</a>
+              extension (or <a href="https://github.com/rust-analyzer/rust-analyzer">rust-analyzer</a>)
+              <ul>
+                <li>Some people prefer JetBrains IDEs like <a href="https://www.jetbrains.com/clion/">CLion</a>
+                  which are also a very excellent choice</li>
+              </ul>
+            </li>
+          </ul>
+          </ul>
+        </section>
+
+        <section>
+          <section>
+            <h1>Async in Rust</h1>
+          </section>
+
+          <section>
+
+            <p>First class support for async programming landed in Rust with <strong>v1.39</strong> in November 2019.</p>
+            <p>By "first class" we mean support for async/await in the language.</p>
+          </section>
+
+          <section>
+            <p>
+              Before we had async/await in Rust, writing asynchronous I/O
+              intensive programs was, well, unpleasant.
+            </p>
+
+            <p>
+              Non-trivial sequences of asynchronous operations involved construction of
+              long combinator chains.
+            </p>
+            <p>
+              Combined with error handling and lifetimes, you get large type names and
+              larger error messages!
+            </p>
+          </section>
+
+          <section>
+            <img src="img/combinator-riot.png" alt="Combinator nesting gone mad!"
+              width="755" height="1248" style="transform: translate(0%, -25%)" />
+          </section>
+  
+          <section>
+            <p>Making a HTTP request for example might have looked like this:</p>
+            <pre><code data-trim data-noescape data-line-numbers="4-10">
+fn main() -> Result<(), Box&lt;dyn std::error::Error&gt;> {
+  let mut rt = Runtime::new()?;
+  rt.block_on(
+    reqwest::get("https://httpbin.org/ip")
+      .map_err(|e| Box::new(e))
+      .and_then(|res| {
+        res.json::&lt;HashMap&lt;String, String&gt;&gt;()
+          .map_err(|e| Box::new(e))
+      })
+      .map_ok(|res| println!("{:#?}", res)),
+  )
+  .unwrap();
+
+  Ok(())
+}</code>
+          </section>
+  
+          <section>
+            With async/await, that code looks like this now:
+            <pre><code data-trim data-noescape data-line-numbers="1-9|4,6">
+#[tokio::main]
+async fn main() -> Result<(), Box&lt;dyn std::error::Error&gt;> {
+  let resp = reqwest::get("https://httpbin.org/ip")
+    .await?
+    .json::&lt;HashMap&lt;String, String&gt;&gt;()
+    .await?;
+  println!("{:#?}", resp);
+  Ok(())
+}</code></pre>
+          </section>
+        </section>
+
+        <section>
+          <section>
+            <h1>Rust Futures</h1>
+          </section>
+
+          <section>
+            <p>A `Future` is a trait that represents a type that will yield a value at some
+            point in the future.</p>
+            <p>Analogus to JavaScript promises and .NET tasks.</p>
+            <pre><code data-trim data-noescape data-line-numbers>
+pub trait Future {
+  type Output;
+
+  fn poll(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output>;
+}</code></pre>
+
+            <p>Rust futures are <em>poll</em> based unlike JS or .NET.</p>
+          </section>
+
+          <section>
+            <p>Let's
+              <a href="https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=bf982a52a93559b4b892ec2cb589c54d">implement</a>
+              a simple future that immediately yields a value.</p>
+            <p>Similar to .NET's <code>Task.FromResult</code> or JS's <code>Promise.resolve</code>.</p>
+            <pre><code data-trim data-noescape data-line-numbers>
+use std::pin::Pin;
+use std::future::Future;
+use std::task::{Poll, Context};
+
+struct Ready&lt;T&gt;(Option&lt;T&gt;);
+
+impl<T: Unpin> Future for Ready<T> {
+  type Output = T;
+  
+  fn poll(mut self: Pin<&mut Self>, _cx: &mut Context) -> Poll&lt;Self::Output&gt; {
+    Poll::Ready(self.0.take().unwrap())
+  }
+}</code></pre>
+            </code>
+          </section>
+
+          <section>
+            <p>But that was a bit too simple.</p>
+            <p class="fragment">Let's build a timer future.</p>
+            <p class="fragment">The world's worst timer future.</p>
+            <p class="fragment">It will spin up a new thread for every timer and just call <code>thread::sleep()</code>.</p>
+          </section>
+
+          <section>
+            <h2>Lab 1</h2>
+            <h3>Implement a future by hand</h3>
+            <p style="font-size: 1.5em;"><a href="https://aka.ms/rust-async-lab1">https://aka.ms/rust-async-lab1</a></p>
+          </section>
+        </section>
+
+        <section>
+          <h3>Feedback</h3>
+          <p>It'd be awesome if you could please fill out a feedback form here:</p>
+
+          <p style="font-size: 1.5em;"><a href="https://aka.ms/rust-async-feedback">https://aka.ms/rust-async-feedback</a></section></p>
+        </section>
+      </div>
+    </div>
+
+    <script src="js/reveal.js"></script>
+
+    <script>
+      // More info about config & dependencies:
+      // - https://github.com/hakimel/reveal.js#configuration
+      // - https://github.com/hakimel/reveal.js#dependencies
+      Reveal.initialize({
+        hash: true,
+        slideNumber: true,
+        dependencies: [
+          { src: 'plugin/markdown/marked.js' },
+          { src: 'plugin/markdown/markdown.js' },
+          { src: 'plugin/highlight/highlight.js' },
+          { src: 'plugin/notes/notes.js', async: true }
+        ]
+      });
+    </script>
+  </body>
+</html>
