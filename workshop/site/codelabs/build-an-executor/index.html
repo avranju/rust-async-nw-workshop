@@ -1,0 +1,248 @@
+
+<!doctype html>
+
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+  <meta name="theme-color" content="#4F7DC9">
+  <meta charset="UTF-8">
+  <title>Build an executor</title>
+  <link rel="stylesheet" href="//fonts.googleapis.com/css?family=Source+Code+Pro:400|Roboto:400,300,400italic,500,700|Roboto+Mono">
+  <link rel="stylesheet" href="//fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://storage.googleapis.com/codelab-elements/codelab-elements.css">
+  <style>
+    .success {
+      color: #1e8e3e;
+    }
+    .error {
+      color: red;
+    }
+  </style>
+</head>
+<body>
+  <google-codelab-analytics gaid="UA-49880327-14"></google-codelab-analytics>
+  <google-codelab codelab-gaid=""
+                  id="build-an-executor"
+                  title="Build an executor"
+                  environment="web"
+                  feedback-link="https://github.com/avranju/rust-async-nw-workshop/issues">
+    
+      <google-codelab-step label="What is an Executor?" duration="1">
+        <p>An executor is responsible for driving a future to completion. It is typically handed an instance of a type that implements <code>Future</code> – which might be the root of a sub-graph of futures – and is expected to drive the entire graph of futures till all of them have returned <code>Poll::Ready</code> from their <code>poll</code> functions.</p>
+<h2 is-upgraded>Create project</h2>
+<p>Create a new library project like so:</p>
+<pre><code>cargo new --lib executor
+</code></pre>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Channels" duration="2">
+        <p>We&#39;ll use Rust <a href="https://doc.rust-lang.org/stable/std/sync/mpsc/fn.channel.html" target="_blank">channels</a> to co-ordinate work. Rust channels are an abstraction that allow 2 threads to safely pass messages between them. A channel has a sender half and a receiving half. Both the halves are connected to each other so that if one is destroyed then the other stops functioning – in other words, calls to send/receive messages will fail.</p>
+<p>Channels can be bounded or unbounded. Bounded channels can be used to model backpressure. The channel in the standard library is a multiple-producer-single-consumer implementation. You can clone the sender half as many times as you like but you can have only one receiver.</p>
+<p>Here&#39;s an example from the standard library documentation:</p>
+<pre><code>use std::thread;
+use std::sync::mpsc::channel;
+
+// Create a simple streaming channel
+let (tx, rx) = channel();
+
+thread::spawn(move|| {
+  tx.send(10).unwrap();
+});
+
+assert_eq!(rx.recv().unwrap(), 10);
+</code></pre>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Task" duration="2">
+        <p>We&#39;ll define a <code>Task</code> type that represents a future that needs to run. The task will include a <code>SyncSender</code> (the sender half of a bounded channel) that can be used to re-schedule the future in case it is not complete yet.</p>
+<pre><code>pub struct Task {
+    future: Mutex&lt;Option&lt;BoxFuture&lt;&#39;static, ()&gt;&gt;&gt;,
+    task_sender: SyncSender&lt;Arc&lt;Task&gt;&gt;,
+}
+</code></pre>
+<p><code>BoxFuture</code> is a type we will use from the <a href="https://crates.io/crates/futures" target="_blank">futures</a> crate. A <code>BoxFuture</code> is a type alias for a <code>Pin&lt;Box&lt;dyn Future&lt;T&gt;&gt;&gt;</code>.</p>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Waker" duration="15">
+        <p>In order for the executor to poll a future it&#39;ll need to provide the future with a <code>Context</code>. A <code>Context</code> can be constructed from a <code>Waker</code> via the <code>Context::from_waker</code> function.</p>
+<p>Implementing a waker by hand requires careful construction of a <a href="https://doc.rust-lang.org/stable/std/task/struct.RawWakerVTable.html" target="_blank">table of function pointers</a> using unsafe code. The <a href="https://crates.io/crates/futures" target="_blank">futures</a> crate however provides a helper trait called <a href="https://docs.rs/futures/0.3.1/futures/task/trait.ArcWake.html" target="_blank">ArcWake</a> and a helper function called <a href="https://docs.rs/futures/0.3.1/futures/task/fn.waker_ref.html" target="_blank">waker_ref</a> which can be used to create a waker using only safe Rust. <code>waker_ref</code> provides a waker given a reference to any type <code>T</code> that implements <code>ArcWake</code>.</p>
+<p><code>ArcWake</code> has been defined like so:</p>
+<pre><code>pub trait ArcWake: Send + Sync {
+  fn wake_by_ref(arc_self: &amp;Arc&lt;Self&gt;);
+
+  fn wake(self: Arc&lt;Self&gt;) { ... }
+}
+</code></pre>
+<p>In other words, if you have some type <code>T</code> that&#39;s wrapped in an <code>Arc</code> then <code>waker_ref</code> is able to provider a <code>Waker</code> implementation in terms of the <code>ArcWake</code> implementation.</p>
+<p>In the case of our <code>Task</code> struct we can simply clone the task and send it down the channel via the <code>task_sender</code> field.</p>
+<pre><code>impl ArcWake for Task {
+  fn wake_by_ref(arc_self: &amp;Arc&lt;Self&gt;) {
+    arc_self
+      .task_sender
+      .send(arc_self.clone())
+      .expect(&#34;too many tasks&#34;);
+  }
+}
+</code></pre>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Executor" duration="15">
+        <p>An executor will simply have a <code>Receiver</code> (the receive half of a bounded channel) that it uses as the source of tasks to be run. Its basically a loop that keeps running as long as the receiver is connected to at least one sender. When a task shows up on the channel, it attempts to poll the future in the task and if it returns <code>Poll::Pending</code> then it puts the future back into the task in order to poll again when the future wakes the executor up later on. If the future returns <code>Poll::Ready</code> then the executor simply drops the future.</p>
+<pre><code>pub struct Executor {
+  ready_queue: Receiver&lt;Arc&lt;Task&gt;&gt;,
+}
+
+impl Executor {
+  pub fn run(&amp;self) {
+    while let Ok(task) = self.ready_queue.recv() {
+      let mut future_slot = task.future.lock().unwrap();
+      if let Some(mut future) = future_slot.take() {
+        let waker = waker_ref(&amp;task);
+        let mut context = Context::from_waker(&amp;waker);
+
+        if let Poll::Pending = future.as_mut().poll(&amp;mut context) {
+          *future_slot = Some(future);
+        }
+      }
+    }
+  }
+}
+</code></pre>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Spawner" duration="15">
+        <p>The spawner is responsible for queueing new tasks with the executor. The spawner will have the sender half of the channel.</p>
+<pre><code>#[derive(Clone)]
+pub struct Spawner {
+    task_sender: SyncSender&lt;Arc&lt;Task&gt;&gt;,
+}
+</code></pre>
+<p>The spawner will have a generic member function called <code>spawn</code> which takes as input some type <code>T</code> that implements <code>Future&lt;Output = ()&gt;</code>. The <code>spawn</code> function must save the future into a <code>Task</code> and send the task down the <code>task_sender</code> channel.</p>
+<pre><code>impl Spawner {
+  pub fn spawn(&amp;self, f: impl Future&lt;Output = ()&gt; + &#39;static + Send) {
+    let f = Box::pin(f);
+    let task = Arc::new(Task {
+      future: Mutex::new(Some(f)),
+      task_sender: self.task_sender.clone(),
+    });
+
+    self.task_sender.send(task).expect(&#34;too many tasks&#34;);
+  }
+}
+</code></pre>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Delay timer" duration="3">
+        <p>Add the <code>Delay</code> timer implementation from the lab where you hand coded a future into the executor project. Add it in a separate file called <code>delay.rs</code>:</p>
+<pre><code>use std::future::Future;
+use std::pin::Pin;
+use std::sync::{Arc, Mutex};
+use std::task::{Context, Poll, Waker};
+use std::thread;
+use std::time::Duration;
+
+#[derive(Clone)]
+pub struct Delay {
+  state: Arc&lt;Mutex&lt;State&gt;&gt;,
+}
+
+#[derive(Clone)]
+struct State {
+  complete: bool,
+  waker: Option&lt;Waker&gt;,
+}
+
+pub fn delay_for(duration: Duration) -&gt; Delay {
+  let delay = Delay {
+    state: Arc::new(Mutex::new(State {
+      complete: false,
+      waker: None,
+    })),
+  };
+  thread::spawn({
+    let delay = delay.clone();
+    move || {
+      thread::sleep(duration);
+      delay.state.lock().unwrap().complete = true;
+      if let Some(waker) = delay.state.lock().unwrap().waker.take() {
+        waker.wake();
+      }
+    }
+  });
+
+  delay
+}
+
+impl Future for Delay {
+  type Output = ();
+
+  fn poll(mut self: Pin&lt;&amp;mut Self&gt;, cx: &amp;mut Context) -&gt; Poll&lt;Self::Output&gt; {
+    if self.state.lock().unwrap().complete {
+      Poll::Ready(())
+    } else {
+      self.state.lock().unwrap().waker = Some(cx.waker().clone());
+      Poll::Pending
+    }
+  }
+}
+
+</code></pre>
+
+
+      </google-codelab-step>
+    
+      <google-codelab-step label="Tying it all together" duration="15">
+        <p>Add a helper function called <code>new_runtime</code> with the following signature so that it is easy to instantiate an executor and a spawner together:</p>
+<pre><code>pub fn new_runtime() -&gt; (Executor, Spawner) {
+  todo!()
+}
+</code></pre>
+<p>With all this in place, add the following test to your library project and try to get it to pass!</p>
+<pre><code>#[cfg(test)]
+mod tests {
+  use super::*;
+
+  use std::time::{Duration, Instant};
+
+  use delay::delay_for;
+
+  #[test]
+  fn executor_works() {
+    let (executor, spawner) = new_runtime();
+    spawner.spawn(async move {
+      delay_for(Duration::from_secs(1)).await;
+    });
+
+    drop(spawner);
+
+    let start = Instant::now();
+    executor.run();
+    assert!(start.elapsed() &gt;= Duration::from_secs(1));
+  }
+}
+</code></pre>
+
+
+      </google-codelab-step>
+    
+  </google-codelab>
+
+  <script src="https://storage.googleapis.com/codelab-elements/native-shim.js"></script>
+  <script src="https://storage.googleapis.com/codelab-elements/custom-elements.min.js"></script>
+  <script src="https://storage.googleapis.com/codelab-elements/prettify.js"></script>
+  <script src="https://storage.googleapis.com/codelab-elements/codelab-elements.js"></script>
+
+</body>
+</html>

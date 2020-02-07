@@ -317,8 +317,13 @@ async fn how_long() {
 
             <div class="fragment">
               <p>If you want both futures to run simultaneously, you'll want to use <code>futures::join!</code>.</p>
-              <pre><code data-trim data-noescape>
-futures::join!(f1, f2)</code>
+              <pre><code data-trim data-noescape data-line-numbers="5">
+async fn how_long() {
+  let f1 = do_sleep();
+  let f2 = do_sleep();
+  
+  futures::join!(f1, f2);
+}</code>
             </div>
           </section>
 
@@ -383,6 +388,12 @@ impl&lt;T: Unpin&gt; Future for Ready&lt;T&gt; {
             <h3>Implement a future by hand</h3>
             <p class="link-style"><a href="https://aka.ms/rust-async-lab2">https://aka.ms/rust-async-lab2</a></p>
           </section>
+        </section>
+
+        <section>
+          <h2>Lab 3</h2>
+          <h3>Build an Executor</h3>
+          <p class="link-style"><a href="https://aka.ms/rust-async-lab3">https://aka.ms/rust-async-lab3</a></p>
         </section>
 
         <section>

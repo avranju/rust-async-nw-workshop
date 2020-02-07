@@ -1,0 +1,23 @@
+{
+  "environment": "web",
+  "format": "html",
+  "prefix": "https://storage.googleapis.com",
+  "mainga": "UA-49880327-14",
+  "updated": "2020-02-07T01:51:48-08:00",
+  "id": "build-an-executor",
+  "duration": 68,
+  "title": "Build an executor",
+  "authors": "Rajasekharan Vengalil",
+  "summary": "Build an executor",
+  "source": "executor.md",
+  "theme": "",
+  "status": [
+    "published"
+  ],
+  "category": [
+    "rust"
+  ],
+  "tags": [],
+  "feedback": "https://github.com/avranju/rust-async-nw-workshop/issues",
+  "url": "build-an-executor"
+}
