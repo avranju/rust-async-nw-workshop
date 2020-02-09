@@ -16,7 +16,17 @@ use rtalk_codec::{Event, EventCodec};
 
 pub struct User {
     name: Option<String>,
+    ip: std::net::SocketAddr,
     sender: Sender<Event>,
+}
+
+impl User {
+    fn get_name(&self) -> String {
+        match self.name.as_ref() {
+            Some(name) => format!("{} [{:?}]", name, self.ip),
+            None => format!("anonymous [{}]", self.ip),
+        }
+    }
 }
 
 struct State {
@@ -28,6 +38,7 @@ impl State {
     fn add_user(
         &mut self,
         session: Session,
+        ip: std::net::SocketAddr,
         mut network: Pin<Box<Framed<TcpStream, EventCodec>>>,
     ) -> u64 {
         self.counter += 1;
@@ -52,7 +63,7 @@ impl State {
                         if let Some(Ok(event)) = event {
                             match event {
                                 Event::RequestJoin(name) => {
-                                    session.update_user(id, name.clone());
+                                    let name: String = session.update_user(id, name.clone());
                                     session.broadcast(|| Event::Joined(name.clone())).await;
                                 }
                                 Event::Leave() => {
@@ -73,19 +84,27 @@ impl State {
             }
         });
 
-        self.users.insert(self.counter, User { name: None, sender });
+        self.users.insert(
+            self.counter,
+            User {
+                name: None,
+                ip,
+                sender,
+            },
+        );
 
         self.counter
     }
 
-    fn get_name(&self, id: u64) -> Option<String> {
+    fn get_name(&self, id: u64) -> String {
         let user = self.users.get(&id).unwrap();
-        user.name.as_ref().cloned()
+        user.get_name()
     }
 
-    fn update_user(&mut self, id: u64, name: String) {
+    fn update_user(&mut self, id: u64, name: String) -> String {
         let user = self.users.get_mut(&id).unwrap();
         user.name = Some(name);
+        user.get_name()
     }
 }
 
@@ -104,25 +123,28 @@ impl Session {
         }
     }
 
-    fn add_user(&self, framed: Pin<Box<Framed<TcpStream, EventCodec>>>) -> u64 {
-        self.state.write().unwrap().add_user(self.clone(), framed)
+    fn add_user(
+        &self,
+        ip: std::net::SocketAddr,
+        framed: Pin<Box<Framed<TcpStream, EventCodec>>>,
+    ) -> u64 {
+        self.state
+            .write()
+            .unwrap()
+            .add_user(self.clone(), ip, framed)
     }
 
     fn get_name(&self, id: u64) -> String {
-        self.state
-            .read()
-            .unwrap()
-            .get_name(id)
-            .unwrap_or_else(|| "unknown".to_string())
+        self.state.read().unwrap().get_name(id)
     }
 
-    fn update_user(&self, id: u64, name: String) {
-        self.state.write().unwrap().update_user(id, name);
+    fn update_user(&self, id: u64, name: String) -> String {
+        self.state.write().unwrap().update_user(id, name)
     }
 
     fn remove_user(&self, id: u64) -> String {
         let user = self.state.write().unwrap().users.remove(&id).unwrap();
-        user.name.unwrap_or_else(|| "unknown".to_string())
+        user.get_name()
     }
 
     fn user_ids(&self) -> Vec<u64> {
@@ -168,11 +190,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut listener = TcpListener::bind("127.0.0.1:3215").await?;
     loop {
-        let (socket, _) = listener.accept().await?;
+        let (socket, ip) = listener.accept().await?;
 
         let session = session.clone();
         let codec = EventCodec;
         let framed = Box::pin(codec.framed(socket));
-        session.add_user(framed);
+        session.add_user(ip, framed);
     }
 }
