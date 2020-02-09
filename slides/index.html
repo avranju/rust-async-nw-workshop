@@ -59,8 +59,10 @@
           <iframe width="560" height="315" src="https://www.youtube.com/embed/NNwK5ZPAJCk" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
           <br>
           <small>The Talk You've Been Await-ing for</small>
+        </section>
 
-          <p>The <a href="https://rust-lang.github.io/async-book/">Rust Async Book</a> is also an excellent (albeit incomplete) resource:</p>
+        <section>
+          <p>The <a href="https://rust-lang.github.io/async-book/">Rust Async Book</a> is also an excellent resource:</p>
           <p class="link-style"><a href="https://aka.ms/rust-async-book">https://aka.ms/rust-async-book</a></p>
         </section>
 
@@ -149,7 +151,7 @@ fn main() -> Result<(), Box&lt;dyn std::error::Error&gt;> {
   .unwrap();
 
   Ok(())
-}</code>
+}</code></pre>
           </section>
   
           <section>
@@ -319,8 +321,9 @@ async fn how_long() {
   f1.await;
   f2.await;
 }</code></pre>
-
-            <div class="fragment">
+          </section>
+          <section>
+            <div>
               <p>If you want both futures to run simultaneously, you'll want to use <code>futures::join!</code>.</p>
               <pre><code data-trim data-noescape data-line-numbers="5">
 async fn how_long() {
@@ -328,7 +331,7 @@ async fn how_long() {
   let f2 = do_sleep();
   
   futures::join!(f1, f2);
-}</code>
+}</code></pre>
             </div>
           </section>
 
@@ -346,7 +349,7 @@ impl Future for Delay {
 
   fn poll(mut self: Pin&lt;&amp;mut Self&gt;, cx: &amp;mut Context) -&gt; Poll&lt;Self::Output&gt; {
     // if async I/O work is complete
-    cx.waker.wake();
+    cx.waker().wake();
     Poll::Ready(())
   }
 }</code></pre>

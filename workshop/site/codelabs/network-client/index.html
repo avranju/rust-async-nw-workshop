@@ -40,21 +40,24 @@
     
       <google-codelab-step label="rtalk-server" duration="30">
         <p>This is a fairly simple chat server. It has the ability to accept TCP connections from multiple clients. It maintains an in-memory session and assigns unique integral identifiers for each user that connects. It receives messages and broadcasts them. It listens for connections on TCP port <code>3215</code>.</p>
-<p>Spend some time reviewing the server code and see how it is implemented. Identify areas that you may be able to improve the implementation.</p>
+<p>Spend some time reviewing the server code and see how it is implemented.</p>
 
 
       </google-codelab-step>
     
       <google-codelab-step label="rtalk-codec" duration="15">
         <p>This crate implements the data transfer codec. Events sent on the wire are represented in-memory as an enum:</p>
-<pre><code>pub enum Event {
-    Join(String),
-    JoinResponse(u64),
-    Leave(u64),
-    Message(u64, String),
+<pre><code>#[derive(Debug)]
+pub enum Event {
+    RequestJoin(String),
+    Joined(String),
+    Leave(),
+    Left(String),
+    MessageSend(String),
+    MessageReceived(String, String),
 }
 </code></pre>
-<p>This crate provides an implementation for the <code>Encoder</code> and <code>Decoder</code> traits from the <code>tokio-util</code> crate. This implementation is common and can be reused from the client app. Review this implementation and see if you can re-factor the code so it is structured better.</p>
+<p>This crate provides an implementation for the <code>Encoder</code> and <code>Decoder</code> traits from the <code>tokio-util</code> crate. This implementation is common and can be reused from the client app. Review this implementation.</p>
 
 
       </google-codelab-step>
@@ -63,8 +66,8 @@
         <p>The <code>rtalk-client</code> crate currently is unimplemented. Your task is to review the server implementation and try to come up with an implementation that does the following:</p>
 <ul>
 <li>Opens a TCP connection to the server on port <code>3215</code></li>
-<li>Sends an <code>Event::Join</code> message as soon as it connects</li>
-<li>Starts up a loop that&#39;s listening for messages from the server and from standard input and does the appropriate processing, i.e., when an <code>Event::Message</code> is received from the server, print the message to the screen and when a line of text has been read from the terminal, send an <code>Event::Message</code> to the server.</li>
+<li>Sends an <code>Event::RequestJoin</code> message as soon as it connects</li>
+<li>Starts up a loop that&#39;s listening for messages from the server and from standard input and does the appropriate processing, i.e., when an <code>Event::MessageReceived</code> is received from the server, print the message to the screen and when a line of text has been read from the terminal, send an <code>Event::MessageSend</code> to the server.</li>
 </ul>
 
 
