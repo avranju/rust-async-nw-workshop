@@ -1,3 +1,5 @@
+#![recursion_limit="256"]
+
 use std::env;
 use std::error::Error;
 
@@ -27,32 +29,34 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // send a join message
     framed
-        .send(Event::Join(user_name))
+        .send(Event::RequestJoin(user_name))
         .await
         .expect("Message send failed.");
 
     let mut stdin = FramedRead::new(io::stdin(), LinesCodec::new());
-    let mut user_id = 0;
 
     loop {
         select! {
             event = framed.next().fuse() => {
                 if let Some(Ok(event)) = event {
-                    println!("{:?}", event);
+                    // dbg!(&event);
                     match event {
-                        Event::JoinResponse(id) => {
-                            user_id = id;
-                        }
-                        Event::Message(id, msg) => {
-                            println!("id:> {}", msg);
-                        }
+                        Event::Joined(who) => {
+                            println!("JOINED:> {}", who);
+                        },
+                        Event::Left(who) => {
+                            println!("LEFT:> {}", who);
+                        },
+                        Event::MessageReceived(who, msg) => {
+                            println!("{}:> {}", who, msg);
+                        },
                         _ => unreachable!(),
                     }
                 }
             },
             msg = stdin.next().fuse() => {
                 if let Some(Ok(msg)) = msg {
-                    framed.send(Event::Message(user_id, msg)).await.expect("Message send failed.");
+                    framed.send(Event::MessageSend(msg)).await.expect("Message send failed.");
                 }
             },
             complete => break,
