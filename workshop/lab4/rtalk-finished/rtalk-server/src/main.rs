@@ -1,12 +1,11 @@
-#![recursion_limit="512"]
+#![recursion_limit = "512"]
 
 use std::collections::BTreeMap;
 use std::pin::Pin;
 use std::sync::{Arc, RwLock};
 
-use futures::{future,select};
-use futures_util::{future::FutureExt,sink::SinkExt};
-use log::info;
+use futures::{future, select};
+use futures_util::{future::FutureExt, sink::SinkExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::stream::StreamExt;
 use tokio::sync::mpsc;
@@ -18,7 +17,6 @@ use rtalk_codec::{Event, EventCodec};
 pub struct User {
     name: Option<String>,
     sender: Sender<Event>,
-    task: tokio::task::JoinHandle<()>,
 }
 
 struct State {
@@ -27,14 +25,18 @@ struct State {
 }
 
 impl State {
-    fn add_user(&mut self, session: Session, mut network: Pin<Box<Framed<TcpStream, EventCodec>>>) -> u64 {
+    fn add_user(
+        &mut self,
+        session: Session,
+        mut network: Pin<Box<Framed<TcpStream, EventCodec>>>,
+    ) -> u64 {
         self.counter += 1;
 
         let id = self.counter;
 
-        let (mut sender, mut rx) = mpsc::channel::<Event>(100);
+        let (sender, mut rx) = mpsc::channel::<Event>(100);
 
-        let task = tokio::spawn(async move {
+        let _task = tokio::spawn(async move {
             loop {
                 select! {
 
@@ -51,35 +53,16 @@ impl State {
                             match event {
                                 Event::RequestJoin(name) => {
                                     session.update_user(id, name.clone());
-            
-                                    let users = session.user_ids();
-                                    let futs = users.into_iter().map(|dest_id| {
-                                        session.send_event(dest_id, Event::Joined(name.clone()))
-                                    });
-                                    future::join_all(futs).await;
+                                    session.broadcast(|| Event::Joined(name.clone())).await;
                                 }
                                 Event::Leave() => {
                                     let name = session.remove_user(id);
-            
-                                    let futs = session
-                                        .user_ids()
-                                        .into_iter()
-                                        .map(|dest_id| session.send_event(dest_id, Event::Left(name.clone())));
-                                    future::join_all(futs).await;
+                                    session.broadcast(|| Event::Left(name.clone())).await;
+                                    break;
                                 }
                                 Event::MessageSend(msg) => {
                                     let who = session.get_name(id);
-                                    let futs = session
-                                        .user_ids()
-                                        .into_iter()
-                                        //.filter(|id2| *id2 != id)
-                                        .map(|dest_id| {
-                                            session.send_event(
-                                                dest_id,
-                                                Event::MessageReceived(who.clone(), msg.clone()),
-                                            )
-                                        });
-                                    future::join_all(futs).await;
+                                    session.broadcast(|| Event::MessageReceived(who.clone(), msg.clone())).await;
                                 }
                                 _ => unimplemented!()
                             }
@@ -90,21 +73,14 @@ impl State {
             }
         });
 
-        self.users.insert(
-            self.counter,
-            User {
-                name: None,
-                sender,
-                task,
-            },
-        );
+        self.users.insert(self.counter, User { name: None, sender });
 
         self.counter
     }
 
     fn get_name(&self, id: u64) -> Option<String> {
         let user = self.users.get(&id).unwrap();
-        user.name.as_ref().map(|n| n.clone())
+        user.name.as_ref().cloned()
     }
 
     fn update_user(&mut self, id: u64, name: String) {
@@ -129,7 +105,6 @@ impl Session {
     }
 
     fn add_user(&self, framed: Pin<Box<Framed<TcpStream, EventCodec>>>) -> u64 {
-        
         self.state.write().unwrap().add_user(self.clone(), framed)
     }
 
@@ -160,6 +135,14 @@ impl Session {
             .collect()
     }
 
+    async fn broadcast<F: Fn() -> Event>(&self, event_gen: F) {
+        let futs = self
+            .user_ids()
+            .into_iter()
+            .map(|dest_id| self.send_event(dest_id, event_gen()));
+        future::join_all(futs).await;
+    }
+
     async fn send_event(&self, id: u64, evt: Event) {
         let mut sender = {
             let state = self.state.read().unwrap();
@@ -170,7 +153,10 @@ impl Session {
             }
         };
 
-        sender.send(evt).await.expect("Could not queue event to send");
+        sender
+            .send(evt)
+            .await
+            .expect("Could not queue event to send");
     }
 }
 

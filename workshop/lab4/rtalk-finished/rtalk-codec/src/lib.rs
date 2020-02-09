@@ -3,7 +3,7 @@ use std::io::{Error, ErrorKind};
 use bytes::{Buf, BufMut, BytesMut};
 use tokio_util::codec::{Decoder, Encoder};
 
-const MAGIC_COOKIE: u32 = 0xDEADBEEF;
+const MAGIC_COOKIE: u32 = 0xDEAD_BEEF;
 
 #[derive(Debug)]
 pub enum Event {
@@ -30,7 +30,7 @@ impl Event {
 
 pub struct EventCodec;
 
-fn put_string(dst: &mut BytesMut, string: &String) {
+fn put_string(dst: &mut BytesMut, string: &str) {
     let buf = string.as_bytes();
     dst.put_u64(buf.len() as u64);
     dst.put_slice(buf);
@@ -53,8 +53,7 @@ impl Encoder for EventCodec {
                 put_string(dst, msg);
             }
 
-            Event::Leave() => {
-            }
+            Event::Leave() => {}
 
             Event::MessageReceived(who, msg) => {
                 put_string(dst, who);
@@ -71,7 +70,7 @@ impl Decoder for EventCodec {
     type Error = Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        if src.len() == 0 {
+        if src.is_empty() {
             src.reserve(5);
             return Ok(None);
         }
@@ -119,9 +118,7 @@ impl Decoder for EventCodec {
 
                 Event::Joined(user)
             }
-            2 => {
-                Event::Leave()
-            }
+            2 => Event::Leave(),
             3 => {
                 if src.len() < 8 {
                     src.reserve(8);

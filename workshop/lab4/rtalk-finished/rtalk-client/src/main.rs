@@ -1,4 +1,4 @@
-#![recursion_limit="256"]
+#![recursion_limit = "256"]
 
 use std::env;
 use std::error::Error;
@@ -56,7 +56,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
             },
             msg = stdin.next().fuse() => {
                 if let Some(Ok(msg)) = msg {
-                    framed.send(Event::MessageSend(msg)).await.expect("Message send failed.");
+                    match msg.as_ref() {
+                        "!q" => {
+                            framed.send(Event::Leave()).await.expect("Message send failed.");
+                            break;
+                        },
+                        _ => framed.send(Event::MessageSend(msg)).await.expect("Message send failed."),
+                    }
                 }
             },
             complete => break,
